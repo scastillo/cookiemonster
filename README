@@ -1,0 +1,66 @@
+fluidsnarfs 0.1
+Sebastián Castillo Builes <castillobuiles@gmail.com>, <sebastian.castillo@fluidsignal.com>
+http://people.fluidsignal.com/~scastillo/fluidsnarfs
+=================================================================
+
+I wrote this tool to help penetration testers to do the stealing
+cookie attack. Please don't abuse this software.
+
+
+---++ Requirements
+
+This software requires the following libraries:
+
+   * Libpcap -  http://www.tcpdump.org/
+
+
+---++ Tests
+
+This software has been tested in:
+
+   * Linux 2.6.25-2-amd64, libpcap 0.8
+
+
+---++ General
+
+   * Compile: 
+$ make
+
+   * Clean: 
+$ make clean
+
+   * Install: 
+# make install
+
+   * Uninstall
+# make uninstall
+
+   * Help and usage:
+# ./fluidsnarfs
+
+
+---++ Release layout
+
+   * /src
+   	The source files directory (*.c)
+
+   * /includes
+   	Headers with definitions (*.h)
+
+   * /bin
+   	Where to put binaries after make
+
+   * /doc
+	Documentation (manpages, examples)
+
+   * LICENSE
+	The license that conditionates the distribution of the software
+
+   * COPYING
+   	Conditions of distribution and reference to the license
+
+   * README
+   	This fabulous explanation file
+		
+   * TODO
+   	New features and fixes

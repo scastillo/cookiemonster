@@ -1,0 +1,65 @@
+fluidsnarfs 0.1
+Sebastián Castillo Builes <castillobuiles@gmail.com>
+http://people.fluidsignal.com/~scastillo/fluidsnarfs
+=================================================================
+
+---+ TODO
+
+   * Configuration management
+      - Subversion
+
+   * Error handling
+      - Remove ugly fprintf from functions
+      - Estandarize error numbers. Maybe with errno
+   
+   * Log system (INFO, DEBUG, etc..)
+
+   * Device management
+      - Modular device management and automatic device selection
+
+   * Pair revision
+      - Estructured revision by a partner
+
+   * Autotools
+      - Portable configuration scripts
+
+   * Optparse
+      - GNU way options parsing
+      - --help should include "Reposrt bugs to mail-addr"
+      - --version (page 12 GNU standars)
+      - Other like section 4.8 GNU coding standars
+
+   * Packaging
+      - Debian
+      - RPM
+      - Cygwin
+
+   * CLI (Like ettercap-one)
+      - Help (h)
+      - Pause sniffing (p)
+      - Restart sniffing (s)
+      - Quit (q)
+
+   * Capture statistics
+      - Catch SIGTERM (C-c) to show statistics before exit
+
+   * Unit tests
+
+   * Manpages
+      - nrof
+      - html
+
+   * Project web page
+      - http://people.fluidsignal.com/~scastillo/fluidsnarfs
+
+   * Many interfaces
+      - Library: To use from anopther program
+      - GUI (GTK+)
+   
+   * Output to file
+      - -o, --output
+
+   * Coding standars
+      - Function baces in column one
+      - Function name in column one
+
