@@ -21,3 +21,6 @@ install:
 
 uninstall:
 	rm $(INSTALL_PATH)/$(EXEC_NAME)
+
+check-syntax:
+	$(CC) $(CFLAGS) -o #sytax_check_output# -S ${CHK_SOURCES}
