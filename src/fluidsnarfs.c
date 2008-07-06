@@ -25,7 +25,7 @@
 #include <stdio.h>		/* standard buffered input/output */
 #include <pcap.h>		/* tcpdump packet capture library */
 #include <arpa/inet.h>		/* definitions for internet operations */
-#include <stdlib.h>
+#include <stdlib.h>             /* exit function and status definition */
 #include <net/if.h>		/* device name size */
 #include <string.h>		/* memset */
 
@@ -47,11 +47,14 @@ static char pcap_errbuf[PCAP_ERRBUF_SIZE];	/* sniffer error buffer */
  * device_check_link: check link type
  * 
  */
-static bpf_u_int32
-device_get_inet4_addr (char *dev_name)
+bpf_u_int32
+device_get_ip_address (char* dev_name)
 {
   bpf_u_int32 net, mask;
-  if (pcap_lookupnet (dev_name, &net, &mask, pcap_errbuf) == -1)
+  int pcap_lookupnet_return;
+  
+  pcap_lookupnet_return = pcap_lookupnet (dev_name, &net, &mask, pcap_errbuf);
+  if (pcap_lookupnet_return == -1)
     {
       fprintf (stderr, "\nError getting device inet address:\n%s\n",
 	       pcap_errbuf);
@@ -60,10 +63,13 @@ device_get_inet4_addr (char *dev_name)
   return net;
 }
 
-static int
-device_check_link (pcap_t * pcap, char *dev_name)
+int
+device_check_link (pcap_t* pcap, char* dev_name)
 {
-  if (pcap_datalink (pcap) != DLT_EN10MB)
+  int datalink;
+  
+  datalink = pcap_datalink(pcap);
+  if (datalink != DLT_EN10MB)
     {
       fprintf (stderr, "%s is not an Ethernet device\n", dev_name);
       return -1;
@@ -78,13 +84,12 @@ device_check_link (pcap_t * pcap, char *dev_name)
 void
 print_banner (void)
 {
-
   printf ("My name is %s,\n%s\nversion %s\n", APP_NAME, APP_DESC,
 	  APP_VERSION);
   printf ("\n%s\n", APP_COPYRIGHT);
   printf ("%s\n", APP_DISCLAIMER);
   printf ("\n");
-
+  
   return;
 }
 
@@ -104,18 +109,13 @@ print_usage (void)
 }
 
 
-/* ------------------------------------------------------------
- *  For information about following code, view cookimonster.h
- * ------------------------------------------------------------
- */
-
-unsigned char *
-seek_cookie (const unsigned char *payload, int len)
+unsigned char*
+get_cookie (const unsigned char* payload, int len)
 {
-  unsigned char *cookie;
+  unsigned char* cookie;
 
-  cookie = (unsigned char *) strstr ((char *) payload, "Cookie");
-
+  cookie = (unsigned char*) strstr ((char*) payload, "Cookie");
+  
   return cookie;
 }
 
@@ -124,42 +124,46 @@ seek_cookie (const unsigned char *payload, int len)
  * HTTP sniffer
  */
 
-static int
-http_sniff_packets (pcap_t * pcap)
+int
+start_sniffing (pcap_t* pcap)
 {
-
-  if (pcap_loop (pcap, -1, http_sniff_read_packets, NULL) < 0)
+  int pcap_loop_return;
+  
+  pcap_loop_return = pcap_loop (pcap, -1, get_tcp_payload, NULL);
+  if ( pcap_loop_return < 0 )
     {
-      http_sniff_close_packets (pcap);
+      close_pcap_session (pcap);
       return -1;
     }
 
-  http_sniff_close_packets (pcap);
+  close_pcap_session (pcap);
   return 0;
 }
 
 void
-http_sniff_read_packets (unsigned char *args,
-			 const struct pcap_pkthdr *header,
-			 const unsigned char *packet)
+get_tcp_payload (unsigned char* args,
+		 const struct pcap_pkthdr* header,
+		 const unsigned char* packet)
 {
   static int count = 1;
 
   // TODO: Dont do the printf here!!, improve the way to get payload withouth all ether, ip, tcp stuff                                                                                                              
   // const struct ethernet_headed *ether;
-  const struct ip_header *ip;
-  const struct tcp_header *tcp;
-  const unsigned char *payload;
-  const unsigned char *cookie;
+  const struct ip_header* ip;
+  const struct tcp_header* tcp;
+  const unsigned char* payload;
+  const unsigned char* cookie;
 
-  int size_ip, size_tcp = 0, size_payload = 0;
-
-  const unsigned char *ch;
+  int size_ip, size_tcp = 0, size_payload;
+  
+  const unsigned char* ch;
 
   //ether = (struct ethernet_header*)(packet);
 
-  ip = (struct ip_header *) (packet + SIZE_ETHERNET);
-  if ((size_ip = IP_HL (ip) * 4) < 20)
+  ip = (struct ip_header*) (packet + SIZE_ETHERNET);
+  size_ip = IP_HL (ip) * 4;
+
+  if ( size_ip < 20 )
     {
       printf ("   * Invalid IP header length: %u bytes\n", size_ip);
       return;
@@ -171,7 +175,7 @@ http_sniff_read_packets (unsigned char *args,
       return;
     }
 
-  tcp = (struct tcp_header *) (packet + SIZE_ETHERNET + size_ip);
+  tcp = (struct tcp_header*) (packet + SIZE_ETHERNET + size_ip);
   if ((size_tcp = TH_OFF (tcp) * 4) < 20)
     {
       printf ("Invalid TCP header length: %u bytes\n", size_tcp);
@@ -179,12 +183,14 @@ http_sniff_read_packets (unsigned char *args,
     }
 
 
-  payload = (unsigned char *) (packet + SIZE_ETHERNET + size_ip + size_tcp);
+  payload = (unsigned char*) (packet + SIZE_ETHERNET + size_ip + size_tcp);
   size_payload = ntohs (ip->ip_len) - (size_ip + size_tcp);
 
   if (size_payload > 0)
     {
-      if ((cookie = seek_cookie (payload, size_payload)) != NULL)
+      cookie = get_cookie(payload, size_payload);
+      
+      if ( cookie != NULL )
 	{
 	  /* print source and destination IP addresses */
 	  printf ("from: %s\n", inet_ntoa (ip->ip_src));
@@ -194,83 +200,87 @@ http_sniff_read_packets (unsigned char *args,
 	  ch = cookie;
 	  while (*ch != '\n')
 	    {
-	      if (isprint (*ch))
-		{
-		  printf ("%c", *ch);
-		}
-	      else
-		{
-		  printf (".");
-		}
+	      printf( "%c", isprint(*ch) ? *ch : '.' );
 	      ch++;
 	    }
-
 	  printf ("\n");
 	  printf ("%d packets since start\n\n", count);
 	  count++;
 	}
     }
-
+  
   return;
 }
 
-static void
-http_sniff_close_packets (pcap_t * pcap)
+void
+close_pcap_session (pcap_t* pcap)
 {
   pcap_close (pcap);
   return;
 }
 
-static pcap_t *
-http_sniff_open_packets (char *dev_name, bpf_u_int32 dev_inet4_addr,
-			 char *port)
+pcap_t*
+open_pcap_session (char* dev_name)
 {
-  pcap_t *pcap;
-
-  char *filter;
-  //TODO: sprintf
-#define PREFILTER "port "
-
-  struct bpf_program compiled_filter;
-
-  filter =
-    (char *) calloc (strlen (port) + strlen (PREFILTER), sizeof (char));
-  strcat (filter, PREFILTER);
-  strcat (filter, port);
-
-  if ((pcap = pcap_open_live (dev_name, BUFSIZ, 1, 0, pcap_errbuf)) == NULL)
+  pcap_t* pcap; /* session file descriptor */
+  
+  pcap = pcap_open_live (dev_name, BUFSIZ, 1, 0, pcap_errbuf);
+  if ( pcap == NULL )
     {
       fprintf (stderr, "\nError opening device for sniffing session:\n%s\n",
 	       pcap_errbuf);
       return NULL;
     }
+  
+  return pcap;
+}
 
-  if ((pcap_compile (pcap, &compiled_filter, filter, 1000, dev_inet4_addr)) <
-      0)
+int
+set_pcap_filter (pcap_t* pcap, bpf_u_int32 ip_addr, char* port)
+{
+  int pcap_compile_return, pcap_setfilter_return;
+  char* filter;
+  struct bpf_program compiled_filter;
+
+  //TODO: sprintf
+#define PREFILTER "port "
+  
+  filter =
+    (char*) calloc (strlen (port) + strlen (PREFILTER), sizeof (char));
+  
+  strcat (filter, PREFILTER);
+  strcat (filter, port);
+  
+  pcap_compile_return = 
+    (pcap_compile (pcap, &compiled_filter, filter, 1000, ip_addr));
+  
+  if ( pcap_compile_return < 0)
     {
       fprintf (stderr, "\nError compiling pcap filter:\n%s\n",
 	       pcap_geterr (pcap));
-      return NULL;
+      return -1;
     }
 
-  if ((pcap_setfilter (pcap, &compiled_filter)) < 0)
+  pcap_setfilter_return = (pcap_setfilter (pcap, &compiled_filter));
+  
+  if ( pcap_setfilter_return < 0 )
     {
       fprintf (stderr, "\nError setting pcap filter:\n%s\n",
 	       pcap_geterr (pcap));
-      return NULL;
+      return -1;
     }
-
+  /* free compiling resources */
   pcap_freecode (&compiled_filter);
-
-  return pcap;
+  
+  return 0;
 }
 
 
 /* Catch SIGINT, show stats and exit*/
 /* FIXME: How to pass pcap_t to signal manager??*/
 /* I dont wanna have a global stuff :( */
-static void
-http_sniff_signal (int signal)
+void
+catch_signal (int signal)
 {
   /*struct pcap_stat stats;
 
@@ -279,27 +289,38 @@ http_sniff_signal (int signal)
      exit(EXIT_FAILURE);
      } */
 
-  printf ("\n---Stats:\n\n");
-  printf ("Received: %d\n", 2);	//stats.ps_recv);
+  //printf ("\n---Stats:\n\n");
+  //printf ("Received: %d\n", 2);	//stats.ps_recv);
+  printf("\n\n---Bye---i\n\n");
   exit (EXIT_SUCCESS);
 }
 
+char*
+timestamp ()
+{
+  time_t rawtime;
+  struct tm* timeinfo;
+
+  time (&rawtime);
+  timeinfo = localtime (&rawtime);
+  
+  return asctime(timeinfo);
+}
 
 
 int
-main (int argc, char *argv[])
+main (int argc, char* argv[])
 {
-  pcap_t *pcap;
-  char *dev_name = argv[1];	// TODO: gestionar interfaz por defecto y protegerse de la entrada. optparse?
-  bpf_u_int32 dev_inet4_addr;
+  pcap_t* pcap;                 /* session filedescriptor */
+  char* dev_name = argv[1];	/* TODO: Default deviec management */
+  bpf_u_int32 ip_addr;
 
-  char *port;			/* port to pcap_filter traffic */
+  char* port;			/* port to pcap_filter traffic */
 
   uid_t uid;
 
-  time_t rawtime;
-  struct tm *timeinfo;
-
+    
+  int device_check_link_return; /* return sucess or failure value */
 
   if (argc > 3 || argc < 2)
     {
@@ -324,31 +345,44 @@ main (int argc, char *argv[])
       print_usage ();
       exit (EXIT_FAILURE);
     }
+  
+  /* open session and get filedescriptor */
+  pcap = open_pcap_session (dev_name);
+  
+  if ( pcap == NULL )
+    {
+      exit (EXIT_FAILURE);
+    }
+  
+  /* get the device ip address. needed to apply filter */
+  ip_addr = device_get_ip_address (dev_name);
+  
+  if ( ip_addr == 0 )
+    {
+      exit (EXIT_FAILURE);
+    }
 
-  if ((dev_inet4_addr = device_get_inet4_addr (dev_name)) == 0)
-    {
-      exit (EXIT_FAILURE);
-    }
-  if ((pcap =
-       http_sniff_open_packets (dev_name, dev_inet4_addr, port)) == NULL)
-    {
-      exit (EXIT_FAILURE);
-    }
-  if ((device_check_link (pcap, dev_name)) == -1)
-    {
-      exit (EXIT_FAILURE);
-    }
-  //TODO: get_time()
-  time (&rawtime);
-  timeinfo = localtime (&rawtime);
+  /* filter trafic sniffed in the actual session */
+  set_pcap_filter(pcap, ip_addr, port);
+  
+  /* check link type */
+  device_check_link_return = device_check_link (pcap, dev_name);
 
+  if ( device_check_link_return == -1 )
+    {
+      exit (EXIT_FAILURE);
+    }
+  
+  /* all right.. so say hello and begin */
   print_banner ();
-
-  signal (SIGINT, http_sniff_signal);
-
+  
+  /* catch exit signal to say good bye at the end */
+  signal (SIGINT, catch_signal);
+  
   printf ("Eating cookies from [%s], port [%s]\n", dev_name, port);
-  printf ("%s", asctime (timeinfo));
-  http_sniff_packets (pcap);
+  printf ("%s\n---\n\n", timestamp());
+  start_sniffing (pcap);
+  
   return 0;
 }
 

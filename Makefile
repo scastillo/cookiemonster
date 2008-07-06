@@ -23,4 +23,4 @@ uninstall:
 	rm $(INSTALL_PATH)/$(EXEC_NAME)
 
 check-syntax:
-	$(CC) $(CFLAGS) -o #sytax_check_output# -S ${CHK_SOURCES}
+	$(CC) $(CFLAGS) -o /tmp/fluidsnarf_sytax_check_output -S ${CHK_SOURCES}
