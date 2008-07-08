@@ -22,7 +22,10 @@ This software has been tested in:
 
 
 ---++ General
-
+############################################
+#     SECTION DEPRECATED NOW USING CMAKE.  #
+#     TODO: document the cmake way         #
+############################################
    * Compile: 
 $ make
 
