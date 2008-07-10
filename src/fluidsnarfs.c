@@ -1,3 +1,4 @@
+
 /*
  * Fluid Snarfs - The cookie monster
  * fluidsnarfs.c
@@ -27,6 +28,10 @@
 #include <arpa/inet.h>		/* definitions for internet operations */
 #include <stdlib.h>             /* exit function and status definition */
 #include <net/if.h>		/* device name size */
+
+#include <netinet/ip.h>         /* ip header */
+#include <netinet/tcp.h>        /* tcp header */
+
 #include <string.h>		/* memset */
 
 #include <unistd.h>		/* getuid */
@@ -47,7 +52,7 @@ static char pcap_errbuf[PCAP_ERRBUF_SIZE];	/* sniffer error buffer */
  * device_check_link: check link type
  * 
  */
-bpf_u_int32
+static bpf_u_int32
 device_get_ip_address (char* dev_name)
 {
   bpf_u_int32 net, mask;
@@ -63,7 +68,7 @@ device_get_ip_address (char* dev_name)
   return net;
 }
 
-int
+static int
 device_check_link (pcap_t* pcap, char* dev_name)
 {
   int datalink;
@@ -81,7 +86,7 @@ device_check_link (pcap_t* pcap, char* dev_name)
 /*
  * legal banner
  */
-void
+static void
 print_banner (void)
 {
   printf ("My name is %s,\n%s\nversion %s\n", APP_NAME, APP_DESC,
@@ -96,7 +101,7 @@ print_banner (void)
 /*
  * usage syntax
  */
-void
+static void
 print_usage (void)
 {
   printf ("Usage: %s [interface]\n", APP_NAME);
@@ -109,7 +114,7 @@ print_usage (void)
 }
 
 
-unsigned char*
+inline unsigned char*
 get_cookie (const unsigned char* payload, int len)
 {
   unsigned char* cookie;
@@ -148,20 +153,17 @@ get_tcp_payload (unsigned char* args,
   static int count = 1;
 
   // TODO: Dont do the printf here!!, improve the way to get payload withouth all ether, ip, tcp stuff                                                                                                              
-  // const struct ethernet_headed *ether;
-  const struct ip_header* ip;
-  const struct tcp_header* tcp;
+  const struct ip* ip;
+  const struct tcphdr* tcp;
   const unsigned char* payload;
   const unsigned char* cookie;
 
   int size_ip, size_tcp = 0, size_payload;
   
   const unsigned char* ch;
-
-  //ether = (struct ethernet_header*)(packet);
-
-  ip = (struct ip_header*) (packet + SIZE_ETHERNET);
-  size_ip = IP_HL (ip) * 4;
+  
+  ip = (struct ip*) (packet + SIZE_ETHERNET);
+  size_ip = ip->ip_hl * 4;
 
   if ( size_ip < 20 )
     {
@@ -175,8 +177,8 @@ get_tcp_payload (unsigned char* args,
       return;
     }
 
-  tcp = (struct tcp_header*) (packet + SIZE_ETHERNET + size_ip);
-  if ((size_tcp = TH_OFF (tcp) * 4) < 20)
+  tcp = (struct tcphdr*) (packet + SIZE_ETHERNET + size_ip);
+  if ((size_tcp = tcp->doff * 4) < 20)
     {
       printf ("Invalid TCP header length: %u bytes\n", size_tcp);
       return;
